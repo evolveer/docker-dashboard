@@ -1,4 +1,4 @@
-# Docker Dashboard
+# Docker Dashboard  @evolveer
 
 A lightweight, dark-themed web UI for managing Docker containers on a Linux system.
 This is a system for development purposes only and should not be used on production systems
@@ -78,3 +78,7 @@ docker-dashboard/
 | POST     | `/api/containers/<id>/restart`        | Restart a container      |
 | DELETE   | `/api/containers/<id>/remove`         | Force-remove a container |
 | GET      | `/api/containers/<id>/logs`           | Get last 200 log lines   |
+
+## License
+
+MIT. See [LICENSE](/home/kyrac/Downloads/docker-dashboard/LICENSE).
