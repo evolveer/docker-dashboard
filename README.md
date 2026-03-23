@@ -12,6 +12,8 @@ This is a system for development purposes only and should not be used on product
 - **View Logs** — tail the last 200 lines of any container's logs in a modal
 - **Search** — filter containers by name, image, or ID in real time
 - **Stats bar** — shows running/stopped counts, total containers, images, Docker version, and host resources
+- **Network Topology** — interactive graph of containers, Docker networks, and attached IPs
+- **API Monitor** — live request monitor backed by SSE and parsed container logs
 - **Auto-refresh** — polls every 5 seconds (toggle on/off)
 - **Toast notifications** — success/error feedback for every action
 
@@ -62,22 +64,34 @@ docker-dashboard/
 ├── app.py              # Flask backend + Docker SDK API
 ├── start.sh            # Convenience startup script
 ├── README.md
+├── LICENSE
 └── templates/
-    └── index.html      # Single-page frontend (HTML/CSS/JS)
+    └── index.html      # Single-page frontend (HTML/CSS/JS + D3)
 ```
 
 ## API Endpoints
 
-| Method   | Endpoint                              | Description              |
-|----------|---------------------------------------|--------------------------|
-| GET      | `/`                                   | Serve the dashboard UI   |
-| GET      | `/api/info`                           | Docker host info/stats   |
-| GET      | `/api/containers?all=true`            | List containers          |
-| POST     | `/api/containers/<id>/stop`           | Stop a container         |
-| POST     | `/api/containers/<id>/start`          | Start a container        |
-| POST     | `/api/containers/<id>/restart`        | Restart a container      |
-| DELETE   | `/api/containers/<id>/remove`         | Force-remove a container |
-| GET      | `/api/containers/<id>/logs`           | Get last 200 log lines   |
+| Method   | Endpoint                           | Description                        |
+|----------|------------------------------------|------------------------------------|
+| GET      | `/`                                | Serve the dashboard UI             |
+| GET      | `/api/info`                        | Docker host info/stats             |
+| GET      | `/api/containers?all=true`         | List containers                    |
+| POST     | `/api/containers/<id>/stop`        | Stop a container                   |
+| POST     | `/api/containers/<id>/start`       | Start a container                  |
+| POST     | `/api/containers/<id>/restart`     | Restart a container                |
+| DELETE   | `/api/containers/<id>/remove`      | Force-remove a container           |
+| GET      | `/api/containers/<id>/logs`        | Get last 200 log lines             |
+| GET      | `/api/networks`                    | Return graph data for topology tab |
+| POST     | `/api/monitor/start`               | Start tailing running containers   |
+| GET      | `/api/monitor/events`              | Return buffered request events     |
+| GET      | `/api/monitor/stream`              | SSE stream of live request events  |
+| POST     | `/api/monitor/clear`               | Clear the in-memory event buffer   |
+| GET      | `/api/monitor/status`              | Return monitor state               |
+
+## Notes
+
+- The topology view loads `D3.js` from a CDN in the browser.
+- The API monitor only sees HTTP traffic that containers write to stdout/stderr.
 
 ## License
 
