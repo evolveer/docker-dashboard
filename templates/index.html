@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Docker Dashboard</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface2: #1c2128;
+      --border: #30363d;
+      --accent: #238636;
+      --accent-hover: #2ea043;
+      --danger: #da3633;
+      --danger-hover: #f85149;
+      --warn: #d29922;
+      --warn-hover: #e3b341;
+      --info: #1f6feb;
+      --info-hover: #388bfd;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --green: #3fb950;
+      --red: #f85149;
+      --yellow: #d29922;
+      --radius: 8px;
+      --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      --mono: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 60px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .logo svg { color: #1d63ed; }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .refresh-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 14px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .refresh-btn:hover { background: var(--border); border-color: #484f58; }
+
+    .auto-refresh-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .toggle {
+      position: relative;
+      width: 36px;
+      height: 20px;
+    }
+
+    .toggle input { opacity: 0; width: 0; height: 0; }
+
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: var(--border);
+      border-radius: 20px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      background: white;
+      border-radius: 50%;
+      top: 3px;
+      left: 3px;
+      transition: transform 0.2s;
+    }
+
+    .toggle input:checked + .toggle-slider { background: var(--accent); }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(16px); }
+
+    /* ── Stats Bar ── */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      padding: 20px 24px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+    }
+
+    .stat-value {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .stat-value.green { color: var(--green); }
+    .stat-value.red   { color: var(--red); }
+    .stat-value.yellow { color: var(--yellow); }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      padding: 0 24px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .search-box {
+      flex: 1;
+      min-width: 200px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 14px;
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-box:focus { border-color: var(--info); }
+    .search-box::placeholder { color: var(--text-muted); }
+
+    .filter-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 8px 14px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+
+    .filter-btn.active {
+      background: var(--info);
+      border-color: var(--info);
+      color: white;
+    }
+
+    .filter-btn:hover:not(.active) { border-color: #484f58; color: var(--text); }
+
+    /* ── Table ── */
+    .table-wrapper {
+      padding: 0 24px 24px;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    thead {
+      background: var(--surface2);
+    }
+
+    th {
+      padding: 12px 16px;
+      text-align: left;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 14px 16px;
+      font-size: 13px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    .container-name {
+      font-weight: 600;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+
+    .container-id {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .image-name {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: #79c0ff;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+    }
+
+    .status-running  { background: rgba(63,185,80,0.15);  color: var(--green); }
+    .status-running .status-dot  { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
+    .status-exited   { background: rgba(248,81,73,0.15);  color: var(--red); }
+    .status-exited .status-dot   { background: var(--red); }
+    .status-paused   { background: rgba(210,153,34,0.15); color: var(--yellow); }
+    .status-paused .status-dot   { background: var(--yellow); }
+    .status-created  { background: rgba(31,111,235,0.15); color: #79c0ff; }
+    .status-created .status-dot  { background: #79c0ff; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.4; }
+    }
+
+    .ports-cell {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      max-width: 180px;
+    }
+
+    .port-tag {
+      display: inline-block;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+      margin: 1px;
+      font-size: 10px;
+      color: #79c0ff;
+    }
+
+    /* ── Action Buttons ── */
+    .actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: nowrap;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-stop    { background: rgba(218,54,51,0.15); color: var(--danger-hover); border: 1px solid rgba(218,54,51,0.3); }
+    .btn-stop:hover:not(:disabled)    { background: var(--danger); color: white; }
+
+    .btn-start   { background: rgba(35,134,54,0.15); color: var(--green); border: 1px solid rgba(35,134,54,0.3); }
+    .btn-start:hover:not(:disabled)   { background: var(--accent); color: white; }
+
+    .btn-restart { background: rgba(210,153,34,0.15); color: var(--warn); border: 1px solid rgba(210,153,34,0.3); }
+    .btn-restart:hover:not(:disabled) { background: var(--warn); color: white; }
+
+    .btn-logs    { background: rgba(31,111,235,0.15); color: #79c0ff; border: 1px solid rgba(31,111,235,0.3); }
+    .btn-logs:hover:not(:disabled)    { background: var(--info); color: white; }
+
+    .btn-remove  { background: rgba(248,81,73,0.08); color: #f85149; border: 1px solid rgba(248,81,73,0.2); }
+    .btn-remove:hover:not(:disabled)  { background: #f85149; color: white; }
+
+    /* ── Empty / Error States ── */
+    .empty-state {
+      text-align: center;
+      padding: 60px 24px;
+      color: var(--text-muted);
+    }
+
+    .empty-state svg { margin-bottom: 16px; opacity: 0.3; }
+    .empty-state h3  { font-size: 16px; margin-bottom: 8px; color: var(--text); }
+    .empty-state p   { font-size: 13px; }
+
+    .error-banner {
+      margin: 0 24px 16px;
+      background: rgba(218,54,51,0.1);
+      border: 1px solid rgba(218,54,51,0.4);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      font-size: 13px;
+      color: var(--danger-hover);
+      display: none;
+    }
+
+    /* ── Toast ── */
+    #toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 9999;
+    }
+
+    .toast {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 18px;
+      font-size: 13px;
+      color: var(--text);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 280px;
+      animation: slideIn 0.25s ease;
+    }
+
+    .toast.success { border-left: 3px solid var(--green); }
+    .toast.error   { border-left: 3px solid var(--red); }
+    .toast.info    { border-left: 3px solid #79c0ff; }
+
+    @keyframes slideIn {
+      from { transform: translateX(40px); opacity: 0; }
+      to   { transform: translateX(0);    opacity: 1; }
+    }
+
+    /* ── Modal (Logs) ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 200;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 900px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+    }
+
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-title {
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 20px;
+      line-height: 1;
+      padding: 4px;
+      border-radius: 4px;
+      transition: color 0.2s;
+    }
+
+    .modal-close:hover { color: var(--text); }
+
+    .modal-body {
+      overflow-y: auto;
+      flex: 1;
+      padding: 16px 20px;
+    }
+
+    .log-output {
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.7;
+      color: #b3d4f5;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    /* ── Confirm Dialog ── */
+    .confirm-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 300;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .confirm-overlay.open { display: flex; }
+
+    .confirm-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px;
+      max-width: 420px;
+      width: 100%;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+      text-align: center;
+    }
+
+    .confirm-box h3 { font-size: 16px; margin-bottom: 10px; }
+    .confirm-box p  { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
+
+    .confirm-actions { display: flex; gap: 10px; justify-content: center; }
+
+    .btn-confirm-yes {
+      background: var(--danger);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 24px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-confirm-yes:hover { background: var(--danger-hover); }
+
+    .btn-confirm-no {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 24px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-confirm-no:hover { background: var(--border); }
+
+    /* ── Loading spinner ── */
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      display: inline-block;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #484f58; }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="header-left">
+    <div class="logo">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" opacity=".2"/>
+        <path d="M4 8h16M4 12h16M4 16h16M8 4v16M12 4v16M16 4v16" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        <rect x="2" y="2" width="20" height="20" rx="2" stroke="currentColor" stroke-width="1.8" fill="none"/>
+      </svg>
+      Docker Dashboard
+    </div>
+  </div>
+  <div class="header-right">
+    <label class="auto-refresh-label">
+      Auto-refresh
+      <label class="toggle">
+        <input type="checkbox" id="autoRefreshToggle" checked />
+        <span class="toggle-slider"></span>
+      </label>
+    </label>
+    <button class="refresh-btn" onclick="loadAll()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+      Refresh
+    </button>
+  </div>
+</header>
+
+<!-- Stats Bar -->
+<div class="stats-bar" id="statsBar">
+  <div class="stat-card">
+    <div class="stat-label">Running</div>
+    <div class="stat-value green" id="statRunning">—</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Stopped</div>
+    <div class="stat-value red" id="statStopped">—</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Total Containers</div>
+    <div class="stat-value" id="statTotal">—</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Images</div>
+    <div class="stat-value" id="statImages">—</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Docker Version</div>
+    <div class="stat-value" id="statVersion" style="font-size:16px; margin-top:4px;">—</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Host CPUs / RAM</div>
+    <div class="stat-value" id="statCPU" style="font-size:16px; margin-top:4px;">—</div>
+  </div>
+</div>
+
+<!-- Error Banner -->
+<div class="error-banner" id="errorBanner"></div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <input class="search-box" type="text" id="searchBox" placeholder="Search by name, image, or ID…" oninput="renderTable()" />
+  <button class="filter-btn active" id="filterRunning" onclick="setFilter('running')">Running</button>
+  <button class="filter-btn" id="filterAll" onclick="setFilter('all')">All</button>
+</div>
+
+<!-- Table -->
+<div class="table-wrapper">
+  <table id="containerTable">
+    <thead>
+      <tr>
+        <th>Container</th>
+        <th>Image</th>
+        <th>Status</th>
+        <th>Uptime</th>
+        <th>Ports</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody">
+      <tr><td colspan="6"><div class="empty-state"><p>Loading containers…</p></div></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Toast Container -->
+<div id="toast-container"></div>
+
+<!-- Logs Modal -->
+<div class="modal-overlay" id="logsModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+        </svg>
+        <span id="logsTitle">Container Logs</span>
+      </div>
+      <button class="modal-close" onclick="closeLogs()">✕</button>
+    </div>
+    <div class="modal-body">
+      <pre class="log-output" id="logsContent">Loading…</pre>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Dialog -->
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-box">
+    <h3 id="confirmTitle">Are you sure?</h3>
+    <p id="confirmMsg">This action cannot be undone.</p>
+    <div class="confirm-actions">
+      <button class="btn-confirm-no" onclick="closeConfirm()">Cancel</button>
+      <button class="btn-confirm-yes" id="confirmYesBtn">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let allContainers = [];
+  let currentFilter = 'running';
+  let autoRefreshInterval = null;
+  let confirmCallback = null;
+
+  // ── Fetch & Render ──────────────────────────────────────────────
+  async function loadAll() {
+    await Promise.all([loadInfo(), loadContainers()]);
+  }
+
+  async function loadInfo() {
+    try {
+      const res = await fetch('/api/info');
+      const data = await res.json();
+      if (data.error) return;
+      document.getElementById('statRunning').textContent = data.containers_running;
+      document.getElementById('statStopped').textContent = data.containers_stopped;
+      document.getElementById('statTotal').textContent = data.containers;
+      document.getElementById('statImages').textContent = data.images;
+      document.getElementById('statVersion').textContent = data.docker_version;
+      document.getElementById('statCPU').textContent = `${data.cpus} / ${data.memory}`;
+    } catch (e) {}
+  }
+
+  async function loadContainers() {
+    const showAll = currentFilter === 'all';
+    try {
+      const res = await fetch(`/api/containers?all=${showAll}`);
+      const data = await res.json();
+      if (data.error) {
+        showError(data.error);
+        return;
+      }
+      hideError();
+      allContainers = data;
+      renderTable();
+    } catch (e) {
+      showError('Could not connect to the Docker Dashboard backend. Is the server running?');
+    }
+  }
+
+  function renderTable() {
+    const query = document.getElementById('searchBox').value.toLowerCase();
+    const filtered = allContainers.filter(c =>
+      c.name.toLowerCase().includes(query) ||
+      c.image.toLowerCase().includes(query) ||
+      c.id.toLowerCase().includes(query)
+    );
+
+    const tbody = document.getElementById('tableBody');
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6">
+        <div class="empty-state">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="2" y="2" width="20" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/>
+            <line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/>
+          </svg>
+          <h3>No containers found</h3>
+          <p>${query ? 'Try a different search term.' : (currentFilter === 'running' ? 'No containers are currently running.' : 'No containers exist yet.')}</p>
+        </div>
+      </td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = filtered.map(c => {
+      const isRunning = c.status === 'running';
+      const statusClass = `status-${c.status}`;
+      const ports = c.ports.length
+        ? c.ports.map(p => `<span class="port-tag">${p}</span>`).join('')
+        : '<span style="color:var(--text-muted);font-size:11px;">—</span>';
+
+      return `<tr>
+        <td>
+          <div class="container-name">${escHtml(c.name)}</div>
+          <div class="container-id">${c.id}</div>
+        </td>
+        <td><div class="image-name" title="${escHtml(c.image)}">${escHtml(c.image)}</div></td>
+        <td>
+          <span class="status-badge ${statusClass}">
+            <span class="status-dot"></span>${c.status}
+          </span>
+        </td>
+        <td style="color:var(--text-muted);font-size:12px;">${c.uptime}</td>
+        <td class="ports-cell">${ports}</td>
+        <td>
+          <div class="actions">
+            ${isRunning
+              ? `<button class="btn btn-stop"    onclick="confirmAction('stop','${c.full_id}','${escHtml(c.name)}')">
+                   <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg> Stop
+                 </button>
+                 <button class="btn btn-restart" onclick="doAction('restart','${c.full_id}','${escHtml(c.name)}',this)">
+                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Restart
+                 </button>`
+              : `<button class="btn btn-start"   onclick="doAction('start','${c.full_id}','${escHtml(c.name)}',this)">
+                   <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Start
+                 </button>`
+            }
+            <button class="btn btn-logs"    onclick="showLogs('${c.full_id}','${escHtml(c.name)}')">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> Logs
+            </button>
+            <button class="btn btn-remove"  onclick="confirmAction('remove','${c.full_id}','${escHtml(c.name)}')">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg> Remove
+            </button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  // ── Actions ─────────────────────────────────────────────────────
+  async function doAction(action, id, name, btn) {
+    const origHTML = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = `<span class="spinner"></span>`; }
+
+    const method = action === 'remove' ? 'DELETE' : 'POST';
+    const url = action === 'remove'
+      ? `/api/containers/${id}/remove`
+      : `/api/containers/${id}/${action}`;
+
+    try {
+      const res = await fetch(url, { method });
+      const data = await res.json();
+      if (data.success) {
+        toast(data.message, 'success');
+        await loadAll();
+      } else {
+        toast(data.error || 'Action failed.', 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = origHTML; }
+      }
+    } catch (e) {
+      toast('Network error.', 'error');
+      if (btn) { btn.disabled = false; btn.innerHTML = origHTML; }
+    }
+  }
+
+  // ── Confirm Dialog ───────────────────────────────────────────────
+  function confirmAction(action, id, name) {
+    const titles = { stop: 'Stop Container', remove: 'Remove Container' };
+    const msgs   = {
+      stop:   `Stop <strong>${name}</strong>? The container can be restarted later.`,
+      remove: `Permanently remove <strong>${name}</strong>? This cannot be undone.`
+    };
+    document.getElementById('confirmTitle').textContent = titles[action] || 'Confirm';
+    document.getElementById('confirmMsg').innerHTML = msgs[action] || 'Proceed?';
+    document.getElementById('confirmYesBtn').textContent = action === 'remove' ? 'Remove' : 'Stop';
+    document.getElementById('confirmYesBtn').style.background = action === 'remove' ? '#f85149' : '#da3633';
+    confirmCallback = () => doAction(action, id, name, null);
+    document.getElementById('confirmOverlay').classList.add('open');
+  }
+
+  document.getElementById('confirmYesBtn').addEventListener('click', () => {
+    const callback = confirmCallback;
+    closeConfirm();
+    if (callback) callback();
+  });
+
+  function closeConfirm() {
+    document.getElementById('confirmOverlay').classList.remove('open');
+    confirmCallback = null;
+  }
+
+  // ── Logs Modal ───────────────────────────────────────────────────
+  async function showLogs(id, name) {
+    document.getElementById('logsTitle').textContent = `Logs — ${name}`;
+    document.getElementById('logsContent').textContent = 'Loading…';
+    document.getElementById('logsModal').classList.add('open');
+    try {
+      const res = await fetch(`/api/containers/${id}/logs`);
+      const data = await res.json();
+      document.getElementById('logsContent').textContent = data.logs || '(no output)';
+      const body = document.querySelector('#logsModal .modal-body');
+      body.scrollTop = body.scrollHeight;
+    } catch (e) {
+      document.getElementById('logsContent').textContent = 'Failed to fetch logs.';
+    }
+  }
+
+  function closeLogs() {
+    document.getElementById('logsModal').classList.remove('open');
+  }
+
+  // Close modals on overlay click
+  document.getElementById('logsModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('logsModal')) closeLogs();
+  });
+  document.getElementById('confirmOverlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('confirmOverlay')) closeConfirm();
+  });
+
+  // ── Filter ───────────────────────────────────────────────────────
+  function setFilter(f) {
+    currentFilter = f;
+    document.getElementById('filterRunning').classList.toggle('active', f === 'running');
+    document.getElementById('filterAll').classList.toggle('active', f === 'all');
+    loadContainers();
+  }
+
+  // ── Auto-refresh ─────────────────────────────────────────────────
+  function setupAutoRefresh() {
+    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+    if (document.getElementById('autoRefreshToggle').checked) {
+      autoRefreshInterval = setInterval(loadAll, 5000);
+    }
+  }
+
+  document.getElementById('autoRefreshToggle').addEventListener('change', setupAutoRefresh);
+
+  // ── Toast ────────────────────────────────────────────────────────
+  function toast(msg, type = 'info') {
+    const icons = {
+      success: '✓',
+      error:   '✕',
+      info:    'ℹ'
+    };
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    el.innerHTML = `<span style="font-weight:700;font-size:15px;">${icons[type]}</span> ${escHtml(msg)}`;
+    document.getElementById('toast-container').appendChild(el);
+    setTimeout(() => el.remove(), 4000);
+  }
+
+  // ── Error Banner ─────────────────────────────────────────────────
+  function showError(msg) {
+    const b = document.getElementById('errorBanner');
+    b.textContent = '⚠ ' + msg;
+    b.style.display = 'block';
+  }
+
+  function hideError() {
+    document.getElementById('errorBanner').style.display = 'none';
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Init ─────────────────────────────────────────────────────────
+  loadAll();
+  setupAutoRefresh();
+</script>
+</body>
+</html>
