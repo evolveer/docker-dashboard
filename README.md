@@ -1,6 +1,8 @@
 # Docker Dashboard
 
 A lightweight, dark-themed web UI for managing Docker containers on a Linux system.
+This is a system for development purposes only and should not be used on production systems
+
 
 ## Features
 
